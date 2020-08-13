@@ -1,6 +1,6 @@
 package org.cgspine.nestscroll;
 
-import android.support.v7.widget.RecyclerView;
+import androidx.recyclerview.widget.RecyclerView;
 import android.widget.TextView;
 
 /**

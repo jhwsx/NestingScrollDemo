@@ -1,10 +1,10 @@
 package org.cgspine.nestscroll.one;
 
 import android.content.Context;
-import android.support.design.widget.TabLayout;
-import android.support.v4.view.PagerAdapter;
-import android.support.v4.view.ViewCompat;
-import android.support.v4.view.ViewPager;
+import com.google.android.material.tabs.TabLayout;
+import androidx.viewpager.widget.PagerAdapter;
+import androidx.core.view.ViewCompat;
+import androidx.viewpager.widget.ViewPager;
 import android.util.AttributeSet;
 import android.util.SparseArray;
 import android.view.View;
@@ -18,6 +18,11 @@ import org.cgspine.nestscroll.R;
 import java.util.ArrayList;
 
 /**
+ * 事件分发目标布局，继承于 LinearLayout，实现了 {@link EventDispatchPlanLayout.ITargetView}
+ *
+ * 这里有 TabLayout，ViewPager
+ * 负责填充 ViewPager 以及 TabLayout 里的数据
+ *
  * @author cginechen
  * @date 2016-12-28
  */
@@ -91,7 +96,7 @@ public class EventDispatchTargetLayout extends LinearLayout
             return "item " + (position + 1);
         }
     };
-
+    // 判断 ViewPager 的子 View 是否可以向上滑动
     @Override
     public boolean canChildScrollUp() {
         if (mViewPager == null) {
@@ -107,10 +112,11 @@ public class EventDispatchTargetLayout extends LinearLayout
                     && (listView.getFirstVisiblePosition() > 0 || listView.getChildAt(0)
                     .getTop() < listView.getPaddingTop());
         } else {
+            // 第二个参数 direction：Negative to check scrolling up, positive to check scrolling down.
             return ViewCompat.canScrollVertically(listView, -1);
         }
     }
-
+    // 子 View 的惯性滑动
     @Override
     public void fling(float vy) {
         if (mViewPager == null) {

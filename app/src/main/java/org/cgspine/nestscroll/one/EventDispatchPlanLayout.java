@@ -2,8 +2,8 @@ package org.cgspine.nestscroll.one;
 
 import android.content.Context;
 import android.content.res.TypedArray;
-import android.support.v4.view.MotionEventCompat;
-import android.support.v4.view.ViewCompat;
+import androidx.core.view.MotionEventCompat;
+import androidx.core.view.ViewCompat;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -24,20 +24,41 @@ import org.cgspine.nestscroll.Util;
 public class EventDispatchPlanLayout extends ViewGroup {
     private static final String TAG = "EventDispatchPlanLayout";
     private static final int INVALID_POINTER = -1;
-
+    /**
+     * 头部 View 的 id
+     */
     private int mHeaderViewId = 0;
+    /**
+     * 目标 View 的 id
+     */
     private int mTargetViewId = 0;
+    /**
+     * 头部 View
+     */
     private View mHeaderView;
+    /**
+     * 目标 View
+     */
     private View mTargetView;
     private ITargetView mTarget;
 
     private int mTouchSlop;
-
+    /**
+     * 头部 View 初始的偏移量
+     */
     private int mHeaderInitOffset;
+    /**
+     * 头部 View 当前的偏移量
+     */
     private int mHeaderCurrentOffset;
     private int mHeaderEndOffset = 0;
-
+    /**
+     * 目标 View 初始的偏移量
+     */
     private int mTargetInitOffset;
+    /**
+     * 目标 View 当前的偏移量
+     */
     private int mTargetCurrentOffset;
     private int mTargetEndOffset = 0;
 
@@ -61,7 +82,9 @@ public class EventDispatchPlanLayout extends ViewGroup {
     public EventDispatchPlanLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
         TypedArray array = context.obtainStyledAttributes(attrs, R.styleable.EventDispatchPlanLayout, 0, 0);
+        // 获取头部 View 的 id
         mHeaderViewId = array.getResourceId(R.styleable.EventDispatchPlanLayout_header_view, 0);
+        // 获取目标 View 的 id
         mTargetViewId = array.getResourceId(R.styleable.EventDispatchPlanLayout_target_view, 0);
 
         mHeaderInitOffset = array.getDimensionPixelSize(R.styleable.
@@ -71,7 +94,7 @@ public class EventDispatchPlanLayout extends ViewGroup {
         mHeaderCurrentOffset = mHeaderInitOffset;
         mTargetCurrentOffset = mTargetInitOffset;
         array.recycle();
-
+        // 允许改变子类绘制顺序
         ViewCompat.setChildrenDrawingOrderEnabled(this, true);
 
         final ViewConfiguration vc = ViewConfiguration.get(getContext());
@@ -81,7 +104,7 @@ public class EventDispatchPlanLayout extends ViewGroup {
         mScroller = new Scroller(getContext());
         mScroller.setFriction(0.98f);
     }
-
+    // 在这里可以获取子 View
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
@@ -94,6 +117,9 @@ public class EventDispatchPlanLayout extends ViewGroup {
         }
     }
 
+    /**
+     * 确保 Target View 实现了 ITargetView 接口
+     */
     private void ensureTarget() {
         if (mTargetView instanceof ITargetView) {
             mTarget = (ITargetView) mTargetView;
@@ -102,6 +128,9 @@ public class EventDispatchPlanLayout extends ViewGroup {
         }
     }
 
+    /**
+     * 确保有头部 View 和目标 View
+     */
     private void ensureHeaderViewAndScrollView() {
         if (mHeaderView != null && mTargetView != null) {
             return;
@@ -136,18 +165,34 @@ public class EventDispatchPlanLayout extends ViewGroup {
         // 去掉默认行为，使得每个事件都会经过这个Layout
     }
 
+    /**
+     * 测量过程
+     * @param widthMeasureSpec
+     * @param heightMeasureSpec
+     */
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         ensureHeaderViewAndScrollView();
+        // 不走 measureChild 方法，直接确定好测量规格，这种方式不会受targetView布局参数的影响了。
         int scrollMeasureWidthSpec = MeasureSpec.makeMeasureSpec(
                 getMeasuredWidth() - getPaddingLeft() - getPaddingRight(), MeasureSpec.EXACTLY);
         int scrollMeasureHeightSpec = MeasureSpec.makeMeasureSpec(
                 getMeasuredHeight() - getPaddingTop() - getPaddingBottom(), MeasureSpec.EXACTLY);
+        // 这行代码之后会调用 LinearLayout 的 onMeasure 方法，完成 TargetView 的测量。
         mTargetView.measure(scrollMeasureWidthSpec, scrollMeasureHeightSpec);
         measureChild(mHeaderView, widthMeasureSpec, heightMeasureSpec);
+//        measureChild(mTargetView, widthMeasureSpec, heightMeasureSpec);
     }
 
+    /**
+     * 布局过程
+     * @param changed
+     * @param l
+     * @param t
+     * @param r
+     * @param b
+     */
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         final int width = getMeasuredWidth();
@@ -161,10 +206,12 @@ public class EventDispatchPlanLayout extends ViewGroup {
         final int childTop = getPaddingTop();
         final int childWidth = width - getPaddingLeft() - getPaddingRight();
         final int childHeight = height - getPaddingTop() - getPaddingBottom();
+        // 布局 targetView
         mTargetView.layout(childLeft, childTop + mTargetCurrentOffset,
                 childLeft + childWidth, childTop + childHeight + mTargetCurrentOffset);
         int refreshViewWidth = mHeaderView.getMeasuredWidth();
         int refreshViewHeight = mHeaderView.getMeasuredHeight();
+        // 布局头部 View
         mHeaderView.layout((width / 2 - refreshViewWidth / 2), mHeaderCurrentOffset,
                 (width / 2 + refreshViewWidth / 2), mHeaderCurrentOffset + refreshViewHeight);
     }
@@ -175,7 +222,7 @@ public class EventDispatchPlanLayout extends ViewGroup {
         ensureHeaderViewAndScrollView();
         final int action = MotionEventCompat.getActionMasked(ev);
         int pointerIndex;
-
+        // 不阻断事件的快路径：如果目标view可以往上滚动或者`EventDispatchPlanLayout`不是enabled
         if (!isEnabled() || mTarget.canChildScrollUp()) {
             Log.d(TAG, "fast end onIntercept: isEnabled = " + isEnabled() + "; canChildScrollUp = "
                     + mTarget.canChildScrollUp());
@@ -189,6 +236,7 @@ public class EventDispatchPlanLayout extends ViewGroup {
                 if (pointerIndex < 0) {
                     return false;
                 }
+                // 在 down 的时候记录初始的 y 值
                 mInitialDownY = ev.getY(pointerIndex);
                 break;
 
@@ -200,10 +248,12 @@ public class EventDispatchPlanLayout extends ViewGroup {
                 }
 
                 final float y = ev.getY(pointerIndex);
+                // 判断是否 dragging
                 startDragging(y);
                 break;
 
             case MotionEventCompat.ACTION_POINTER_UP:
+                // 双指逻辑处理
                 onSecondaryPointerUp(ev);
                 break;
 
@@ -219,6 +269,7 @@ public class EventDispatchPlanLayout extends ViewGroup {
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
+        // 多点触控使用这个方法获取事件类型
         final int action = MotionEventCompat.getActionMasked(ev);
         int pointerIndex;
 
@@ -232,11 +283,13 @@ public class EventDispatchPlanLayout extends ViewGroup {
 
         switch (action) {
             case MotionEvent.ACTION_DOWN:
+                // 获取一个指针(手指)的唯一标识符ID，在手指按下和抬起之间ID始终不变。
                 mActivePointerId = ev.getPointerId(0);
                 mIsDragging = false;
                 break;
 
             case MotionEvent.ACTION_MOVE: {
+                // 通过PointerId获取到当前状态下 pointIndex，之后通过 pointIndex 获取其他内容。
                 pointerIndex = ev.findPointerIndex(mActivePointerId);
                 if (pointerIndex < 0) {
                     Log.e(TAG, "Got ACTION_MOVE event but have an invalid active pointer id.");
@@ -265,7 +318,7 @@ public class EventDispatchPlanLayout extends ViewGroup {
                 }
                 break;
             }
-            case MotionEventCompat.ACTION_POINTER_DOWN: {
+            case MotionEventCompat.ACTION_POINTER_DOWN: { // 有非主要的手指按下(即按下之前已经有手指在屏幕上)。
                 pointerIndex = MotionEventCompat.getActionIndex(ev);
                 if (pointerIndex < 0) {
                     Log.e(TAG, "Got ACTION_POINTER_DOWN event but have an invalid action index.");
@@ -275,7 +328,7 @@ public class EventDispatchPlanLayout extends ViewGroup {
                 break;
             }
 
-            case MotionEventCompat.ACTION_POINTER_UP:
+            case MotionEventCompat.ACTION_POINTER_UP: // 有非主要的手指抬起(即抬起之后仍然有手指在屏幕上)。
                 onSecondaryPointerUp(ev);
                 break;
 
