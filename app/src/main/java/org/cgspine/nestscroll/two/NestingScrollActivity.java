@@ -52,7 +52,7 @@ public class NestingScrollActivity extends AppCompatActivity {
 
         return super.onOptionsItemSelected(item);
     }
-
+    // 这里使用 RecyclerView 作为列表，原因是 ListView 没有实现 NestedScrollingChild 接口
     private RecyclerView getPageView(int pos) {
         RecyclerView view = mPageMap.get(pos);
         if (view == null) {

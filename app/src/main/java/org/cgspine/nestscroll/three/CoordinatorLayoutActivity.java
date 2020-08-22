@@ -1,15 +1,19 @@
 package org.cgspine.nestscroll.three;
 
 import android.os.Bundle;
+
 import androidx.annotation.Nullable;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
+
 import com.google.android.material.tabs.TabLayout;
+
 import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.appcompat.widget.Toolbar;
+
 import android.util.SparseArray;
 import android.view.MenuItem;
 import android.view.View;
@@ -42,15 +46,15 @@ public class CoordinatorLayoutActivity extends AppCompatActivity {
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setDisplayShowHomeEnabled(true);
 
-    mHeaderView = findViewById(R.id.book_header);
-    CoordinatorLayout.LayoutParams headerLp = (CoordinatorLayout.LayoutParams) mHeaderView
-            .getLayoutParams();
-    headerLp.setBehavior(new CoverBehavior(Util.dp2px(this, 30), 0));
+        mHeaderView = findViewById(R.id.book_header);
+        CoordinatorLayout.LayoutParams headerLp = (CoordinatorLayout.LayoutParams) mHeaderView
+                .getLayoutParams();
+        headerLp.setBehavior(new CoverBehavior(Util.dp2px(this, 30), 0));
 
-    mTargetLayout = (LinearLayout) findViewById(R.id.scroll_view);
-    CoordinatorLayout.LayoutParams targetLp = (CoordinatorLayout.LayoutParams) mTargetLayout
-            .getLayoutParams();
-    targetLp.setBehavior(new TargetBehavior(this, Util.dp2px(this, 70), 0));
+        mTargetLayout = (LinearLayout) findViewById(R.id.scroll_view);
+        CoordinatorLayout.LayoutParams targetLp = (CoordinatorLayout.LayoutParams) mTargetLayout
+                .getLayoutParams();
+        targetLp.setBehavior(new TargetBehavior(this, Util.dp2px(this, 70), 0));
 
         mTabLayout = (TabLayout) findViewById(R.id.tab_layout);
         mViewPager = (ViewPager) findViewById(R.id.viewpager);

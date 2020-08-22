@@ -2,6 +2,8 @@ package org.cgspine.nestscroll.two;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+
+import androidx.annotation.NonNull;
 import androidx.core.view.NestedScrollingParent;
 import androidx.core.view.NestedScrollingParentHelper;
 import androidx.core.view.ViewCompat;
@@ -26,11 +28,11 @@ public class NestingScrollPlanLayout extends ViewGroup implements NestedScrollin
     private int mTargetViewId = 0;
     private View mHeaderView;
     private View mTargetView;
-
+    // 头部 View 偏移量
     private int mHeaderInitOffset;
     private int mHeaderCurrentOffset;
     private int mHeaderEndOffset = 0;
-
+    // target View 偏移量
     private int mTargetInitOffset;
     private int mTargetCurrentOffset;
     private int mTargetEndOffset = 0;
@@ -52,14 +54,15 @@ public class NestingScrollPlanLayout extends ViewGroup implements NestedScrollin
         mTargetViewId = array.getResourceId(R.styleable.NestingScrollPlanLayout_target_view, 0);
 
         mHeaderInitOffset = array.getDimensionPixelSize(R.styleable.
-                EventDispatchPlanLayout_header_init_offset, Util.dp2px(getContext(), 20));
+                NestingScrollPlanLayout_header_init_offset, Util.dp2px(getContext(), 20));
         mTargetInitOffset = array.getDimensionPixelSize(R.styleable.
-                EventDispatchPlanLayout_target_init_offset, Util.dp2px(getContext(), 40));
+                NestingScrollPlanLayout_target_init_offset, Util.dp2px(getContext(), 40));
         mHeaderCurrentOffset = mHeaderInitOffset;
         mTargetCurrentOffset = mTargetInitOffset;
         array.recycle();
 
-        ViewCompat.setChildrenDrawingOrderEnabled(this, true);
+        setChildrenDrawingOrderEnabled(true);
+        // 初始化 NestedScrollingParentHelper 这个辅助类
         mNestedScrollingParentHelper = new NestedScrollingParentHelper(this);
 
         mScroller = new Scroller(getContext());
@@ -104,11 +107,12 @@ public class NestingScrollPlanLayout extends ViewGroup implements NestedScrollin
         }
         return i;
     }
-
+    // 测量
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         ensureHeaderViewAndScrollView();
+        // target view 的高度是全屏的高度
         int scrollMeasureWidthSpec = MeasureSpec.makeMeasureSpec(
                 getMeasuredWidth() - getPaddingLeft() - getPaddingRight(), MeasureSpec.EXACTLY);
         int scrollMeasureHeightSpec = MeasureSpec.makeMeasureSpec(
@@ -116,7 +120,7 @@ public class NestingScrollPlanLayout extends ViewGroup implements NestedScrollin
         mTargetView.measure(scrollMeasureWidthSpec, scrollMeasureHeightSpec);
         measureChild(mHeaderView, widthMeasureSpec, heightMeasureSpec);
     }
-
+    // 布局
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         final int width = getMeasuredWidth();
@@ -141,17 +145,22 @@ public class NestingScrollPlanLayout extends ViewGroup implements NestedScrollin
     @Override
     public boolean onStartNestedScroll(View child, View target, int nestedScrollAxes) {
         Log.i(TAG, "onStartNestedScroll: nestedScrollAxes = " + nestedScrollAxes);
+        // 接受纵向滚动
         return isEnabled() && (nestedScrollAxes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0;
     }
 
     @Override
-    public void onNestedScrollAccepted(View child, View target, int axes) {
+    public void onNestedScrollAccepted(@NonNull View child, @NonNull View target, int axes) {
         Log.i(TAG, "onNestedScrollAccepted: axes = " + axes);
+        // 这一步需要交给 NestedScrollingParentHelper 去记录相关变量
         mNestedScrollingParentHelper.onNestedScrollAccepted(child, target, axes);
     }
 
     @Override
-    public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {
+    public void onNestedPreScroll(@NonNull View target, int dx, int dy, @NonNull int[] consumed) {
+        // NestingScroll 滚动前，我们要先看看自己能不能消耗，消耗量记录在 consumed 数组里面
+        // 往上滑动时我们先看看自己可以消耗多少（因为上滑时自己的消耗量可以出现上限），往下滑动时我们看看子元素可以消耗多少（因为下滑时子View的消耗量可以出现上限）
+        // 基于上一点，我们这里只处理上滑的情况
         Log.i(TAG, "onNestedPreScroll: dx = " + dx + " ; dy = " + dy);
         if (canViewScrollUp(target)) {
             return;
@@ -161,9 +170,11 @@ public class NestingScrollPlanLayout extends ViewGroup implements NestedScrollin
             int parentCanConsume = mTargetCurrentOffset - mTargetEndOffset;
             if (parentCanConsume > 0) {
                 if (dy > parentCanConsume) {
+                    // 自己消耗不完，余下部分会给子 View
                     consumed[1] = parentCanConsume;
                     moveTargetViewTo(mTargetEndOffset);
                 } else {
+                    // 自己全部消耗
                     consumed[1] = dy;
                     moveTargetView(-dy);
                 }
@@ -172,7 +183,8 @@ public class NestingScrollPlanLayout extends ViewGroup implements NestedScrollin
     }
 
     @Override
-    public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {
+    public void onNestedScroll(@NonNull View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {
+        // NestingScroll 时，我们只处理往下滑的情况，如果有未消耗的量，则滚动父 View
         Log.i(TAG, "onNestedScroll: dxConsumed = " + dxConsumed + " ; dyConsumed = " + dyConsumed +
                 " ; dxUnconsumed = " + dxUnconsumed + " ; dyUnconsumed = " + dyUnconsumed);
         if (dyUnconsumed < 0 && !(canViewScrollUp(target))) {
@@ -189,6 +201,7 @@ public class NestingScrollPlanLayout extends ViewGroup implements NestedScrollin
     @Override
     public void onStopNestedScroll(View child) {
         Log.i(TAG, "onStopNestedScroll");
+        // 结束滚动：因为不管有没有出现 fling，都会走进这里，所以我这里有一个标志位，如果有fling,则在fling中处理最终定位，否则在结束时处理最终定位
         mNestedScrollingParentHelper.onStopNestedScroll(child);
         if (mHasFling) {
             mHasFling = false;
@@ -203,8 +216,9 @@ public class NestingScrollPlanLayout extends ViewGroup implements NestedScrollin
     }
 
     @Override
-    public boolean onNestedPreFling(View target, float velocityX, float velocityY) {
+    public boolean onNestedPreFling(@NonNull View target, float velocityX, float velocityY) {
         super.onNestedPreFling(target, velocityX, velocityY);
+        // fling 前回调，我们会主动将其滚动到特定位置，如果向上 fling 时，会 return false 表示并不阻断子 view 的 fling
         Log.i(TAG, "onNestedPreFling: mTargetCurrentOffset = " + mTargetCurrentOffset +
                 " ; velocityX = " + velocityX + " ; velocityY = " + velocityY);
         mHasFling = true;

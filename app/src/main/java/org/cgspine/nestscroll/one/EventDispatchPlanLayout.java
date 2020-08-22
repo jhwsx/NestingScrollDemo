@@ -51,6 +51,9 @@ public class EventDispatchPlanLayout extends ViewGroup {
      * 头部 View 当前的偏移量
      */
     private int mHeaderCurrentOffset;
+    /**
+     * 头部 View 结束位置的偏移量
+     */
     private int mHeaderEndOffset = 0;
     /**
      * 目标 View 初始的偏移量
@@ -60,6 +63,9 @@ public class EventDispatchPlanLayout extends ViewGroup {
      * 目标 View 当前的偏移量
      */
     private int mTargetCurrentOffset;
+    /**
+     * 目标 View 结束位置的偏移量
+     */
     private int mTargetEndOffset = 0;
 
     private int mActivePointerId = INVALID_POINTER;
@@ -220,6 +226,7 @@ public class EventDispatchPlanLayout extends ViewGroup {
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         ensureHeaderViewAndScrollView();
+        // 获取多点触控的事件类型
         final int action = MotionEventCompat.getActionMasked(ev);
         int pointerIndex;
         // 不阻断事件的快路径：如果目标view可以往上滚动或者`EventDispatchPlanLayout`不是enabled
@@ -230,8 +237,11 @@ public class EventDispatchPlanLayout extends ViewGroup {
         }
         switch (action) {
             case MotionEvent.ACTION_DOWN:
+                Log.d(TAG, "onInterceptTouchEvent: ACTION_DOWN");
+                // 获取一个指针(手指)的唯一标识符ID，在手指按下和抬起之间ID始终不变。
                 mActivePointerId = ev.getPointerId(0);
-                mIsDragging = false;
+                mIsDragging = false; // down 事件不拦截
+                // 如果没有对应的 pointer id 的数据，那么获取到的 pointer index 就是 -1。
                 pointerIndex = ev.findPointerIndex(mActivePointerId);
                 if (pointerIndex < 0) {
                     return false;
@@ -241,6 +251,7 @@ public class EventDispatchPlanLayout extends ViewGroup {
                 break;
 
             case MotionEvent.ACTION_MOVE:
+                Log.d(TAG, "onInterceptTouchEvent: ACTION_MOVE");
                 pointerIndex = ev.findPointerIndex(mActivePointerId);
                 if (pointerIndex < 0) {
                     Log.e(TAG, "Got ACTION_MOVE event but have an invalid active pointer id.");
@@ -252,18 +263,19 @@ public class EventDispatchPlanLayout extends ViewGroup {
                 startDragging(y);
                 break;
 
-            case MotionEventCompat.ACTION_POINTER_UP:
-                // 双指逻辑处理
+            case MotionEventCompat.ACTION_POINTER_UP: // 有非主要的手指抬起(即抬起之后仍然有手指在屏幕上)。
+                // 多指逻辑处理，此时抬起了次要的手指，更新了 mActivePointerId
                 onSecondaryPointerUp(ev);
                 break;
 
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
+                Log.d(TAG, "onInterceptTouchEvent: " + MotionEvent.actionToString(action));
                 mIsDragging = false;
                 mActivePointerId = INVALID_POINTER;
                 break;
         }
-
+        Log.d(TAG, "onInterceptTouchEvent: mIsDragging = " + mIsDragging);
         return mIsDragging;
     }
 
@@ -300,10 +312,14 @@ public class EventDispatchPlanLayout extends ViewGroup {
 
                 if (mIsDragging) {
                     float dy = y - mLastMotionY;
-                    if (dy >= 0) {
+                    if (dy >= 0) { // 是从上向下的拖动
+                        Log.d(TAG, "onTouchEvent: dy >= 0, 是从上向下的拖动");
                         moveTargetView(dy);
-                    } else {
+                    } else { // 是从下向上的拖动
+                        Log.d(TAG, "onTouchEvent: dy < 0, 是从下向上的拖动");
                         if (mTargetCurrentOffset + dy <= mTargetEndOffset) {
+                            Log.d(TAG, "onTouchEvent: target 已经到达顶部了，重新dispatch一次down事件，使得列表可以继续滚动");
+                            // 已经到达目标 View 的结束偏移位置（到达顶部了）
                             moveTargetView(dy);
                             // 重新dispatch一次down事件，使得列表可以继续滚动
                             int oldAction = ev.getAction();
@@ -374,12 +390,12 @@ public class EventDispatchPlanLayout extends ViewGroup {
 
     private void finishDrag(int vy) {
         Log.i(TAG, "TouchUp: vy = " + vy);
-        if (vy > 0) {
+        if (vy > 0) { // 速率为正，是从上到下
             mNeedScrollToInitPos = true;
             mScroller.fling(0, mTargetCurrentOffset, 0, vy,
                     0, 0, mTargetEndOffset, Integer.MAX_VALUE);
             invalidate();
-        } else if (vy < 0) {
+        } else if (vy < 0) { // 速率为负，是从下到上
             mNeedScrollToEndPos = true;
             mScroller.fling(0, mTargetCurrentOffset, 0, vy,
                     0, 0, mTargetEndOffset, Integer.MAX_VALUE);
@@ -395,6 +411,9 @@ public class EventDispatchPlanLayout extends ViewGroup {
     }
 
     private void startDragging(float y) {
+        // 当前的 y 比 mInitialDownY 大，表明是从上向下拖动
+        // mTargetCurrentOffset > mTargetEndOffset，表明当前 targetView 的偏移量还没有到达结束位置。
+        // 这两个条件满足一个就可以去判定是否是拖动状态
         if (y > mInitialDownY || mTargetCurrentOffset > mTargetEndOffset) {
             final float yDiff = Math.abs(y - mInitialDownY);
             if (yDiff > mTouchSlop && !mIsDragging) {
@@ -416,23 +435,31 @@ public class EventDispatchPlanLayout extends ViewGroup {
         }
     }
 
+    /**
+     * 按 dy 移动目标 View
+     * @param dy
+     */
     private void moveTargetView(float dy) {
         int target = (int) (mTargetCurrentOffset + dy);
         moveTargetViewTo(target);
     }
 
+    /**
+     * 移动目标 View 到目标位置
+     * @param target
+     */
     private void moveTargetViewTo(int target) {
         target = Math.max(target, mTargetEndOffset);
         ViewCompat.offsetTopAndBottom(mTargetView, target - mTargetCurrentOffset);
         mTargetCurrentOffset = target;
-
+        // 计算头部 View 的偏移量
         int headerTarget;
         if (mTargetCurrentOffset >= mTargetInitOffset) {
             headerTarget = mHeaderInitOffset;
         } else if (mTargetCurrentOffset <= mTargetEndOffset) {
             headerTarget = mHeaderEndOffset;
         } else {
-            float percent = (mTargetCurrentOffset - mTargetEndOffset) * 1.0f / mTargetInitOffset - mTargetEndOffset;
+            float percent = (mTargetCurrentOffset - mTargetEndOffset) * 1.0f / (mTargetInitOffset - mTargetEndOffset);
             headerTarget = (int) (mHeaderEndOffset + percent * (mHeaderInitOffset - mHeaderEndOffset));
         }
         ViewCompat.offsetTopAndBottom(mHeaderView, headerTarget - mHeaderCurrentOffset);

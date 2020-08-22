@@ -20,7 +20,7 @@
         app:header_view="@+id/book_header"
         app:target_view="@+id/scroll_view"
         app:header_init_offset="30dp"
-        app:target_init_offset="70dp">
+        app:target_init_offset="100dp">
         <View
             android:id="@id/book_header"
             android:layout_width="120dp"
